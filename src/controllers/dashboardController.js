@@ -44,7 +44,7 @@ async function getDashboardStats(req, res) {
       ]),
       Sale.find({ status: "Completed" }).sort({ saleDate: -1 }).limit(5).select("invoiceNumber customerName totalAmount saleDate paymentStatus").lean(),
       Expense.find().sort({ expenseDate: -1 }).limit(5).select("expenseNumber title category amount expenseDate status").lean(),
-      Product.find({ isActive: true, $expr: { $lte: ["$stockQuantity", "$lowStockThreshold"] } }).sort({ stockQuantity: 1 }).limit(5).select("name sku stockQuantity lowStockThreshold").lean(),
+      Product.find({ isActive: true, stockQuantity: { $gt: 0 }, $expr: { $lte: ["$stockQuantity", "$lowStockThreshold"] } }).sort({ stockQuantity: 1 }).limit(5).select("name sku stockQuantity lowStockThreshold").lean(),
     ]);
 
     const totalSales = r2(salesAgg[0]?.totalSales);

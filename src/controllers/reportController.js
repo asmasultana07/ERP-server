@@ -1,7 +1,6 @@
 const Sale = require("../models/Sale");
 const Purchase = require("../models/Purchase");
 const Expense = require("../models/Expense");
-const Customer = require("../models/Customer");
 const Supplier = require("../models/Supplier");
 const { resolveRange, trendUnit } = require("../utils/dates");
 
@@ -175,16 +174,26 @@ async function getProfitLossReport(req, res) {
       expenseDate: { $gte: range.start, $lte: range.end },
     };
 
-    const [salesAgg, expensesAgg] = await Promise.all([
+    const [saleLevelAgg, itemLevelAgg, expensesAgg] = await Promise.all([
+      // Pipeline 1: sale-level fields — no $unwind, no overcounting
       Sale.aggregate([
         { $match: matchSales },
-        { $unwind: "$items" },
         {
           $group: {
             _id: null,
             revenue: { $sum: "$totalAmount" },
             totalDiscount: { $sum: "$discount" },
             totalPaid: { $sum: "$paidAmount" },
+          },
+        },
+      ]),
+      // Pipeline 2: item-level COGS — $unwind is correct here
+      Sale.aggregate([
+        { $match: matchSales },
+        { $unwind: "$items" },
+        {
+          $group: {
+            _id: null,
             cogsKnown: {
               $sum: {
                 $cond: [
@@ -216,12 +225,13 @@ async function getProfitLossReport(req, res) {
       ]),
     ]);
 
-    const s = salesAgg[0] || {};
+    const sl = saleLevelAgg[0] || {};
+    const il = itemLevelAgg[0] || {};
     const e = expensesAgg[0] || {};
 
-    const revenue = r2(s.revenue);
-    const cogs = r2(s.cogsKnown);
-    const hasUnknownCogs = (s.cogsUnknownQty || 0) > 0;
+    const revenue = r2(sl.revenue);
+    const cogs = r2(il.cogsKnown);
+    const hasUnknownCogs = (il.cogsUnknownQty || 0) > 0;
     const grossProfit = r2(revenue - cogs);
     const operatingExpenses = r2(e.totalExpenses);
     const netProfit = r2(grossProfit - operatingExpenses);
@@ -237,8 +247,8 @@ async function getProfitLossReport(req, res) {
         operatingExpenses,
         paidExpenses: r2(e.paidExpenses),
         netProfit,
-        totalPaidByCustomers: r2(s.totalPaid),
-        totalDiscount: r2(s.totalDiscount),
+        totalPaidByCustomers: r2(sl.totalPaid),
+        totalDiscount: r2(sl.totalDiscount),
       },
     });
   } catch (err) {
@@ -289,7 +299,7 @@ async function getTopProductsReport(req, res) {
           as: "product",
         },
       },
-      { $unwind: { path: "$product", preserveNullAndEmpty: true } },
+      { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
       {
         $project: {
           productId: "$_id",
@@ -385,7 +395,7 @@ async function getSupplierReport(req, res) {
           as: "supplier",
         },
       },
-      { $unwind: { path: "$supplier", preserveNullAndEmpty: true } },
+      { $unwind: { path: "$supplier", preserveNullAndEmptyArrays: true } },
       {
         $project: {
           supplierId: "$_id",
