@@ -11,6 +11,9 @@ const purchaseRoutes = require("./routes/purchaseRoutes");
 const customerRoutes = require("./routes/customerRoutes");
 const saleRoutes = require("./routes/saleRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
+const expenseRoutes = require("./routes/expenseRoutes");
+const reportRoutes = require("./routes/reportRoutes");
+const inventoryRoutes = require("./routes/inventoryRoutes");
 
 dotenv.config();
 
@@ -33,6 +36,9 @@ app.use("/api/purchases", purchaseRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/sales", saleRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/expenses", expenseRoutes);
+app.use("/api/reports", reportRoutes);
+app.use("/api/inventory", inventoryRoutes);
 
 app.use((error, req, res, next) => {
   if (error && error.type === "entity.parse.failed") {
