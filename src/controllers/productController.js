@@ -2,6 +2,8 @@ const mongoose = require("mongoose");
 
 const Product = require("../models/Product");
 const { toProduct } = require("../models/Product");
+const Purchase = require("../models/Purchase");
+const Sale = require("../models/Sale");
 
 function readBody(req) {
   if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
@@ -213,7 +215,7 @@ async function getProducts(req, res) {
       filter.category = { $regex: `^${escapeRegex(category)}$`, $options: "i" };
     }
 
-    const products = await Product.find(filter).sort({ createdAt: -1 });
+    const products = await Product.find(filter).sort({ createdAt: -1 }).lean();
 
     return res.status(200).json({
       success: true,
@@ -307,7 +309,7 @@ async function deleteProduct(req, res) {
       return invalidIdResponse(res);
     }
 
-    const product = await Product.findByIdAndDelete(req.params.id);
+    const product = await Product.findById(req.params.id);
 
     if (!product) {
       return res.status(404).json({
@@ -316,8 +318,43 @@ async function deleteProduct(req, res) {
       });
     }
 
+    // Guard historical referential integrity (audit M1): a product referenced
+    // by any Purchase or Sale (including cancelled transactions) must never be
+    // hard-deleted, otherwise historical reports and invoices would break.
+    const [referencedByPurchase, referencedBySale] = await Promise.all([
+      Purchase.exists({ "items.product": product._id }),
+      Sale.exists({ "items.product": product._id }),
+    ]);
+
+    if (referencedByPurchase || referencedBySale) {
+      // Already inactive: nothing more to do, report the preserved state.
+      if (product.isActive === false) {
+        return res.status(200).json({
+          success: true,
+          deactivated: true,
+          message:
+            "Product has existing transaction history and is already inactive. It has been preserved.",
+          product: toProduct(product),
+        });
+      }
+
+      product.isActive = false;
+      await product.save();
+
+      return res.status(200).json({
+        success: true,
+        deactivated: true,
+        message:
+          "Product was deactivated instead of deleted because it is referenced by existing transaction history.",
+        product: toProduct(product),
+      });
+    }
+
+    await product.deleteOne();
+
     return res.status(200).json({
       success: true,
+      deactivated: false,
       message: "Product deleted",
     });
   } catch (error) {

@@ -19,12 +19,37 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
+
+// Allowed browser origins. CLIENT_URL may be a comma-separated list for
+// production (e.g. "https://app.example.com,https://www.example.com").
+// Common localhost dev origins are always allowed so the frontend still works
+// when Next.js falls back to port 3001 or the browser uses 127.0.0.1.
+const configuredOrigins = (process.env.CLIENT_URL || "http://localhost:3000")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const devOrigins = [
+  "http://localhost:3000",
+  "http://localhost:3001",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:3001",
+];
+
+const allowedOrigins = new Set([...configuredOrigins, ...devOrigins]);
 
 app.use(express.json());
 app.use(
   cors({
-    origin: clientUrl,
+    origin(origin, callback) {
+      // Allow non-browser clients (curl, Postman, server-to-server) which send
+      // no Origin header, plus any explicitly allowed origin.
+      if (!origin || allowedOrigins.has(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error(`Origin ${origin} is not allowed by CORS`));
+    },
+    credentials: true,
   })
 );
 

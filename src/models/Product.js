@@ -77,5 +77,9 @@ function toProduct(product) {
   };
 }
 
+// Indexes for common filters/sorts (list, dashboard low-stock, category filter).
+productSchema.index({ createdAt: -1 });
+productSchema.index({ isActive: 1, category: 1 });
+
 module.exports = mongoose.model("Product", productSchema);
 module.exports.toProduct = toProduct;

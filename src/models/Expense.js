@@ -84,6 +84,9 @@ function toExpense(expense) {
   };
 }
 
+expenseSchema.index({ expenseDate: -1 });
+expenseSchema.index({ category: 1 });
+
 module.exports = mongoose.model("Expense", expenseSchema);
 module.exports.toExpense = toExpense;
 module.exports.EXPENSE_CATEGORIES = EXPENSE_CATEGORIES;

@@ -177,5 +177,10 @@ function toSale(sale) {
   };
 }
 
+// Indexes for reports/dashboard trend queries and product reference lookups.
+saleSchema.index({ status: 1, saleDate: -1 });
+saleSchema.index({ "items.product": 1 });
+saleSchema.index({ customer: 1 });
+
 module.exports = mongoose.model("Sale", saleSchema);
 module.exports.toSale = toSale;

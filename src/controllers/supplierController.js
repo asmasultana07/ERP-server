@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 
 const Supplier = require("../models/Supplier");
 const { toSupplier } = require("../models/Supplier");
+const Purchase = require("../models/Purchase");
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -140,7 +141,7 @@ async function getSuppliers(req, res) {
       ];
     }
 
-    const suppliers = await Supplier.find(filter).sort({ createdAt: -1 });
+    const suppliers = await Supplier.find(filter).sort({ createdAt: -1 }).lean();
 
     return res.status(200).json({
       success: true,
@@ -234,7 +235,7 @@ async function deleteSupplier(req, res) {
       return invalidIdResponse(res);
     }
 
-    const supplier = await Supplier.findByIdAndDelete(req.params.id);
+    const supplier = await Supplier.findById(req.params.id);
 
     if (!supplier) {
       return res.status(404).json({
@@ -243,8 +244,41 @@ async function deleteSupplier(req, res) {
       });
     }
 
+    // Guard historical referential integrity (audit M2): a supplier referenced
+    // by any Purchase (including cancelled purchases) must never be hard-deleted,
+    // otherwise historical purchase records and reports would break.
+    const referencedByPurchase = await Purchase.exists({
+      supplier: supplier._id,
+    });
+
+    if (referencedByPurchase) {
+      if (supplier.isActive === false) {
+        return res.status(200).json({
+          success: true,
+          deactivated: true,
+          message:
+            "Supplier has existing purchase history and is already inactive. It has been preserved.",
+          supplier: toSupplier(supplier),
+        });
+      }
+
+      supplier.isActive = false;
+      await supplier.save();
+
+      return res.status(200).json({
+        success: true,
+        deactivated: true,
+        message:
+          "Supplier was deactivated instead of deleted because it is referenced by existing purchase history.",
+        supplier: toSupplier(supplier),
+      });
+    }
+
+    await supplier.deleteOne();
+
     return res.status(200).json({
       success: true,
+      deactivated: false,
       message: "Supplier deleted",
     });
   } catch (error) {

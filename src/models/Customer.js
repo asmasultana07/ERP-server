@@ -52,5 +52,8 @@ function toCustomer(customer) {
   };
 }
 
+customerSchema.index({ createdAt: -1 });
+customerSchema.index({ isActive: 1 });
+
 module.exports = mongoose.model("Customer", customerSchema);
 module.exports.toCustomer = toCustomer;

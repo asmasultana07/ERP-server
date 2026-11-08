@@ -134,7 +134,7 @@ async function getCustomers(req, res) {
       filter.isActive = req.query.isActive === "true";
     }
 
-    const customers = await Customer.find(filter).sort({ createdAt: -1 });
+    const customers = await Customer.find(filter).sort({ createdAt: -1 }).lean();
 
     return res.status(200).json({
       success: true,

@@ -164,5 +164,10 @@ function toPurchase(purchase) {
   };
 }
 
+// Indexes for reports/dashboard trend queries and supplier/product lookups.
+purchaseSchema.index({ status: 1, purchaseDate: -1 });
+purchaseSchema.index({ supplier: 1 });
+purchaseSchema.index({ "items.product": 1 });
+
 module.exports = mongoose.model("Purchase", purchaseSchema);
 module.exports.toPurchase = toPurchase;
