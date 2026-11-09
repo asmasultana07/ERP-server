@@ -38,6 +38,10 @@ const devOrigins = [
 
 const allowedOrigins = new Set([...configuredOrigins, ...devOrigins]);
 
+// Debug: log allowed origins on startup so you can verify in Render logs
+console.log("[CORS] CLIENT_URL env:", process.env.CLIENT_URL);
+console.log("[CORS] Allowed origins:", [...allowedOrigins]);
+
 const corsOptions = {
   origin(origin, callback) {
     // Allow non-browser clients (curl, Postman, server-to-server) which send
