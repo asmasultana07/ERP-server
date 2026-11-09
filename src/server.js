@@ -38,20 +38,24 @@ const devOrigins = [
 
 const allowedOrigins = new Set([...configuredOrigins, ...devOrigins]);
 
+const corsOptions = {
+  origin(origin, callback) {
+    // Allow non-browser clients (curl, Postman, server-to-server) which send
+    // no Origin header, plus any explicitly allowed origin.
+    if (!origin || allowedOrigins.has(origin)) {
+      return callback(null, true);
+    }
+    // Return false (not an Error) so Express sends a clean 403, not a 500.
+    return callback(null, false);
+  },
+  credentials: true,
+  optionsSuccessStatus: 200, // Some legacy browsers choke on 204
+};
+
 app.use(express.json());
-app.use(
-  cors({
-    origin(origin, callback) {
-      // Allow non-browser clients (curl, Postman, server-to-server) which send
-      // no Origin header, plus any explicitly allowed origin.
-      if (!origin || allowedOrigins.has(origin)) {
-        return callback(null, true);
-      }
-      return callback(new Error(`Origin ${origin} is not allowed by CORS`));
-    },
-    credentials: true,
-  })
-);
+// Handle CORS preflight (OPTIONS) for all routes before any other middleware.
+app.options("*", cors(corsOptions));
+app.use(cors(corsOptions));
 
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
