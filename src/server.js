@@ -58,7 +58,8 @@ const corsOptions = {
 
 app.use(express.json());
 // Handle CORS preflight (OPTIONS) for all routes before any other middleware.
-app.options("*", cors(corsOptions));
+// Use a regex instead of "*" for compatibility with path-to-regexp v8+ (Node 24+).
+app.options(/(.*)/, cors(corsOptions));
 app.use(cors(corsOptions));
 
 app.use("/api/health", healthRoutes);
