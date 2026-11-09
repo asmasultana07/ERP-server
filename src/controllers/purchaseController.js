@@ -470,9 +470,104 @@ async function cancelPurchase(req, res) {
   }
 }
 
+async function updatePurchase(req, res) {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return invalidIdResponse(res, "purchase");
+    }
+
+    const purchase = await Purchase.findById(req.params.id);
+    if (!purchase) {
+      return res.status(404).json({ success: false, message: "Purchase not found" });
+    }
+
+    if (purchase.status === "Cancelled") {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot edit a cancelled purchase",
+      });
+    }
+
+    const body = readBody(req);
+    const errors = [];
+
+    // Allow editing: purchaseDate, paidAmount, discount, notes only.
+    // Items are locked because stock has already been adjusted.
+    let purchaseDate = purchase.purchaseDate;
+    if (body.purchaseDate !== undefined) {
+      const parsed = new Date(body.purchaseDate);
+      if (isNaN(parsed.getTime())) {
+        errors.push("Invalid purchase date");
+      } else {
+        purchaseDate = parsed;
+      }
+    }
+
+    let discount = purchase.discount;
+    if (body.discount !== undefined && body.discount !== "") {
+      discount = Number(body.discount);
+      if (isNaN(discount) || discount < 0) {
+        errors.push("Discount cannot be negative");
+      } else {
+        discount = Math.round(discount * 100) / 100;
+      }
+    }
+
+    if (discount > purchase.subtotal) {
+      errors.push("Discount cannot exceed subtotal");
+    }
+
+    const totalAmount = Math.round((purchase.subtotal - discount) * 100) / 100;
+
+    let paidAmount = purchase.paidAmount;
+    if (body.paidAmount !== undefined && body.paidAmount !== "") {
+      paidAmount = Number(body.paidAmount);
+      if (isNaN(paidAmount) || paidAmount < 0) {
+        errors.push("Paid amount cannot be negative");
+      } else {
+        paidAmount = Math.round(paidAmount * 100) / 100;
+      }
+    }
+
+    if (paidAmount > totalAmount) {
+      errors.push("Paid amount cannot exceed total amount");
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({ success: false, message: errors[0], errors });
+    }
+
+    const dueAmount = Math.round((totalAmount - paidAmount) * 100) / 100;
+    let paymentStatus = "Unpaid";
+    if (paidAmount >= totalAmount && totalAmount > 0) paymentStatus = "Paid";
+    else if (paidAmount > 0) paymentStatus = "Partial";
+
+    purchase.purchaseDate = purchaseDate;
+    purchase.discount = discount;
+    purchase.totalAmount = totalAmount;
+    purchase.paidAmount = paidAmount;
+    purchase.dueAmount = dueAmount;
+    purchase.paymentStatus = paymentStatus;
+    if (typeof body.notes === "string") {
+      purchase.notes = body.notes.trim();
+    }
+
+    await purchase.save();
+
+    const populated = await Purchase.findById(purchase._id)
+      .populate("supplier")
+      .populate("items.product");
+
+    return res.status(200).json({ success: true, purchase: toPurchase(populated) });
+  } catch (error) {
+    return sendUnexpectedError(res, error);
+  }
+}
+
 module.exports = {
   createPurchase,
   getPurchases,
   getPurchase,
+  updatePurchase,
   cancelPurchase,
 };
