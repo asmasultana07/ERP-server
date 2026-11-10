@@ -99,7 +99,7 @@ async function startServer() {
   }
 
   app.listen(PORT, () => {
-    console.log(`Mini ERP API running on http://localhost:${PORT}`);
+    console.log(`VENDORA API running on http://localhost:${PORT}`);
   });
 }
 

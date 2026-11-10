@@ -3,7 +3,7 @@ const { getDatabaseStatus } = require("../config/db");
 function getHealth(req, res) {
   res.json({
     success: true,
-    message: "Mini ERP API is running",
+    message: "VENDORA API is running",
     database: getDatabaseStatus(),
   });
 }
